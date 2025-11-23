@@ -11,7 +11,7 @@ This guide helps you use ComfyUI to run HunyuanVideo-1.5 model.
 
 ## 🚀 Installation
 
-Install ComfyUI from the official repository:
+Install the latest version of ComfyUI from the official repository:
 
 ```bash
 git clone https://github.com/comfyanonymous/ComfyUI.git
@@ -36,7 +36,7 @@ Find workflow templates at:
 - **720p Image-to-Video**: https://github.com/Comfy-Org/workflow_templates/blob/main/templates/video_hunyuan_video_1.5_720p_i2v.json
 - **720p Text-to-Video**: https://github.com/Comfy-Org/workflow_templates/blob/main/templates/video_hunyuan_video_1.5_720p_t2v.json
 
-> **Note**: Workflows are still being updated.
+> **Important**: Workflows are still being updated. Please ensure you are using the latest version of the workflow templates to guarantee the best generation results.
 
 ### How to Use
 
