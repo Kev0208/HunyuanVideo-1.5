@@ -234,6 +234,13 @@ torchrun --nproc_per_node=$N_INFERENCE_GPU generate.py \
   --model_path $MODEL_PATH
 ```
 
+> **Tips:** If your GPU memory is > 14GB but you encounter OOM (Out of Memory) errors during generation, you can try setting the following environment variable before running:
+> ```bash
+> export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
+> ```
+
+
+
 ### Command Line Arguments
 
 | Argument | Type | Required | Default | Description |

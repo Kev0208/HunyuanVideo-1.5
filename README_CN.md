@@ -237,6 +237,11 @@ torchrun --nproc_per_node=$N_INFERENCE_GPU generate.py \
   --model_path $MODEL_PATH
 ```
 
+> **Tips:** 如果您的 GPU 内存 > 14GB 但您在生成过程中遇到 OOM (Out of Memory) 错误，可以尝试在运行前设置以下环境变量：
+> ```bash
+> export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
+> ```
+
 ### 命令行参数
 
 | 参数 | 类型 | 是否必需 | 默认值 | 描述 |
