@@ -39,7 +39,6 @@ from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers import KarrasDiffusionSchedulers
 from diffusers.utils import BaseOutput, deprecate, logging
 
-from hyvideo.commons.cache_helper import CacheHelper
 from hyvideo.commons import (
     PIPELINE_CONFIGS,
     SR_PIPELINE_CONFIGS,
@@ -49,6 +48,7 @@ from hyvideo.commons import (
     get_rank,
     is_flash3_available,
     is_sparse_attn_supported,
+    is_angelslim_available,
 )
 from hyvideo.commons.parallel_states import get_parallel_state
 
@@ -1185,7 +1185,7 @@ class HunyuanVideo_1_5_Pipeline(DiffusionPipeline):
 
         cache_helper = getattr(self, 'cache_helper', None)
         if cache_helper is not None:
-            cache_helper.clear_cache()
+            cache_helper.clear_states()
             assert num_inference_steps == get_infer_state().total_steps
 
         with self.progress_bar(total=num_inference_steps) as progress_bar, auto_offload_model(self.transformer, self.execution_device, enabled=self.enable_offloading):
@@ -1462,12 +1462,30 @@ class HunyuanVideo_1_5_Pipeline(DiffusionPipeline):
         loguru.logger.info(f"{enable_offloading=} {enable_group_offloading=} {overlap_group_offloading=}")
 
         if infer_state.enable_cache:
+            if not is_angelslim_available():
+                raise RuntimeError("Please install angelslim==0.2.1 via `pip install angelslim==0.2.1` to enable cache.")
+            from angelslim.compressor.diffusion import DeepCacheHelper, TeaCacheHelper, TaylorCacheHelper
             no_cache_steps = list(range(0, infer_state.cache_start_step)) + list(range(infer_state.cache_start_step, infer_state.cache_end_step, infer_state.cache_step_interval)) + list(range(infer_state.cache_end_step, infer_state.total_steps))
-            cache_helper = CacheHelper(
-                pipe_model=transformer,
-                no_cache_steps=no_cache_steps, 
-                no_cache_block_id={"double":[53]} # Added single block to skip caching
-            )
+            cache_type = infer_state.cache_type
+            if cache_type == 'deepcache':
+                no_cache_block_id = {"double_blocks":infer_state.no_cache_block_id}
+                cache_helper = DeepCacheHelper(
+                    double_blocks=transformer.double_blocks,
+                    no_cache_steps=no_cache_steps,
+                    no_cache_block_id=no_cache_block_id,
+                )
+            elif cache_type == 'teacache':
+                cache_helper = TeaCacheHelper(
+                    double_blocks=transformer.double_blocks,
+                    no_cache_steps=no_cache_steps,
+                )
+            elif cache_type == 'taylorcache':
+                cache_helper = TaylorCacheHelper(
+                    double_blocks=transformer.double_blocks,
+                    no_cache_steps=no_cache_steps,
+                )
+            else:
+                raise ValueError(f"Unknown cache type: {cache_type}")
             cache_helper.enable()
         else:
             cache_helper = None

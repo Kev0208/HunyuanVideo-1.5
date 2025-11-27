@@ -41,7 +41,8 @@ HunyuanVideo-1.5 is a video generation model that delivers top-tier quality with
 </p>
 
 ## 🔥🔥🔥 News
-* 🚀 Nov 24, 2025: We now support cache inference, achieving approximately 2x speedup! Pull the latest code to try it. 🔥🔥🔥🆕 
+* 🚀 Nov 27, 2025: We now support cache inference (deepcache, teacache, taylorcache), achieving significant speedup! Pull the latest code to try it. 🔥🔥🔥🆕 
+* 🚀 Nov 24, 2025: We now support deepcache inference.
 * 👋 Nov 20, 2025: We release the inference code and model weights of HunyuanVideo-1.5.
 
 
@@ -212,20 +213,22 @@ export I2V_REWRITE_MODEL_NAME="<your_model_name>"
 
 PROMPT='A girl holding a paper with words "Hello, world!"'
 
-IMAGE_PATH=./data/reference_image.png # Optional, 'none' or <image path>
+IMAGE_PATH=none # Optional, none or <image path> to enable i2v mode
 SEED=1
 ASPECT_RATIO=16:9
 RESOLUTION=480p
 OUTPUT_PATH=./outputs/output.mp4
 
 # Configuration
+REWRITE=true # Enable prompt rewriting. Please ensure rewrite vLLM server is deployed and configured.
 N_INFERENCE_GPU=8 # Parallel inference GPU count
 CFG_DISTILLED=true # Inference with CFG distilled model, 2x speedup
 SPARSE_ATTN=false # Inference with sparse attention (only 720p models are equipped with sparse attention). Please ensure flex-block-attn is installed
 SAGE_ATTN=true # Inference with SageAttention
-REWRITE=true # Enable prompt rewriting. Please ensure rewrite vLLM server is deployed and configured.
 OVERLAP_GROUP_OFFLOADING=true # Only valid when group offloading is enabled, significantly increases CPU memory usage but speeds up inference
 ENABLE_CACHE=true # Enable feature cache during inference. Significantly speeds up inference.
+CACHE_TYPE=deepcache # Support: deepcache, teacache, taylorcache
+ENABLE_SR=true # Enable super resolution
 MODEL_PATH=ckpts # Path to pretrained model
 
 torchrun --nproc_per_node=$N_INFERENCE_GPU generate.py \
@@ -234,14 +237,13 @@ torchrun --nproc_per_node=$N_INFERENCE_GPU generate.py \
   --resolution $RESOLUTION \
   --aspect_ratio $ASPECT_RATIO \
   --seed $SEED \
-  --cfg_distilled $CFG_DISTILLED \
-  --sparse_attn $SPARSE_ATTN \
-  --use_sageattn $SAGE_ATTN \
-  --enable_cache $ENABLE_CACHE \
   --rewrite $REWRITE \
-  --output_path $OUTPUT_PATH \
+  --cfg_distilled $CFG_DISTILLED \
+  --sparse_attn $SPARSE_ATTN --use_sageattn $SAGE_ATTN \
+  --enable_cache $ENABLE_CACHE --cache_type $CACHE_TYPE \
   --overlap_group_offloading $OVERLAP_GROUP_OFFLOADING \
-  --save_pre_sr_video \
+  --sr $ENABLE_SR --save_pre_sr_video \
+  --output_path $OUTPUT_PATH \
   --model_path $MODEL_PATH
 ```
 
@@ -281,8 +283,9 @@ torchrun --nproc_per_node=$N_INFERENCE_GPU generate.py \
 | `--dtype` | str | No | `bf16` | Data type for transformer: `bf16` (faster, lower memory) or `fp32` (better quality, slower, higher memory) |
 | `--use_sageattn` | bool | No | `false` | Enable SageAttention (use `--use_sageattn` or `--use_sageattn true/1` to enable, `--use_sageattn false/0` to disable) |
 | `--sage_blocks_range` | str | No | `0-53` | SageAttention blocks range (e.g., `0-5` or `0,1,2,3,4,5`) |
-| `--enable_torch_compile` | bool | No | `false` | Enable torch compile for transformer (use `--enable_torch_compile` or `--enable_torch_compile true/1` to enable, `--enable_torch_compile false/0` to disable) |
 | `--enable_cache` | bool | No | `false` | Enable cache for transformer (use `--enable_cache` or `--enable_cache true/1` to enable, `--enable_cache false/0` to disable) |
+| `--cache_type` | str | No | `deepcache` | Cache type for transformer (e.g., `deepcache, teacache, taylorcache`) |
+| `--no_cache_block_id` | str | No | `53` | Blocks to exclude from deepcache (e.g., `0-5` or `0,1,2,3,4,5`) |
 | `--cache_start_step` | int | No | `11` | Start step to skip when using cache |
 | `--cache_end_step` | int | No | `45` | End step to skip when using cache |
 | `--total_steps` | int | No | `50` | Total inference steps |

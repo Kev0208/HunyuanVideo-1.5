@@ -40,7 +40,8 @@ HunyuanVideo-1.5作为一款轻量级视频生成模型，仅需83亿参数即�
 </p>
 
 ## 🔥🔥🔥 最新动态
-* 🚀 Nov 24, 2025: 我们现已支持 cache 推理，可实现约两倍加速！请 pull 最新代码体验。 🔥🔥🔥🆕 
+* 🚀 Nov 27, 2025: 我们现已支持 cache 推理（deepcache, teacache, taylorcache），可极大加速推理！请 pull 最新代码体验。 🔥🔥🔥🆕 
+* 🚀 Nov 24, 2025: 我们现已支持 deepcache 推理。
 * 👋 Nov 20, 2025: 我们开源了 HunyuanVideo-1.5的代码和推理权重
 
 ## 🎥 演示视频
@@ -214,20 +215,22 @@ export I2V_REWRITE_MODEL_NAME="<your_model_name>"
 
 PROMPT='A girl holding a paper with words "Hello, world!"'
 
-IMAGE_PATH=./data/reference_image.png # 可选，'none' 或 <图像路径>
+IMAGE_PATH=none # 可选，none 或 <图像路径> 以启用 i2v 模式
 SEED=1
 ASPECT_RATIO=16:9
 RESOLUTION=480p
 OUTPUT_PATH=./outputs/output.mp4
 
 # 配置
+REWRITE=true # 启用提示词重写。请确保 rewrite vLLM server 已部署和配置。
 N_INFERENCE_GPU=8 # 并行推理 GPU 数量
 CFG_DISTILLED=true # 使用 CFG 蒸馏模型进行推理，2倍加速
 SPARSE_ATTN=false # 使用稀疏注意力进行推理（仅 720p 模型配备了稀疏注意力）。请确保 flex-block-attn 已安装
 SAGE_ATTN=true # 使用 SageAttention 进行推理
-REWRITE=true # 启用提示词重写。请确保 rewrite vLLM server 已部署和配置。
 OVERLAP_GROUP_OFFLOADING=true # 仅在组卸载启用时有效，会显著增加 CPU 内存占用，但能够提速
 ENABLE_CACHE=true # 启用特征缓存进行推理。显著提升推理速度
+CACHE_TYPE=deepcache # 支持：deepcache, teacache, taylorcache
+ENABLE_SR=true # 启用超分辨率
 MODEL_PATH=ckpts # 预训练模型路径
 
 torchrun --nproc_per_node=$N_INFERENCE_GPU generate.py \
@@ -236,14 +239,13 @@ torchrun --nproc_per_node=$N_INFERENCE_GPU generate.py \
   --resolution $RESOLUTION \
   --aspect_ratio $ASPECT_RATIO \
   --seed $SEED \
-  --cfg_distilled $CFG_DISTILLED \
-  --sparse_attn $SPARSE_ATTN \
-  --use_sageattn $SAGE_ATTN \
-  --enable_cache $ENABLE_CACHE \
   --rewrite $REWRITE \
-  --output_path $OUTPUT_PATH \
+  --cfg_distilled $CFG_DISTILLED \
+  --sparse_attn $SPARSE_ATTN --use_sageattn $SAGE_ATTN \
+  --enable_cache $ENABLE_CACHE --cache_type $CACHE_TYPE \
   --overlap_group_offloading $OVERLAP_GROUP_OFFLOADING \
-  --save_pre_sr_video \
+  --sr $ENABLE_SR --save_pre_sr_video \
+  --output_path $OUTPUT_PATH \
   --model_path $MODEL_PATH
 ```
 
@@ -284,6 +286,8 @@ torchrun --nproc_per_node=$N_INFERENCE_GPU generate.py \
 | `--sage_blocks_range` | str | 否 | `0-53` | SageAttention 块范围（例如：`0-5` 或 `0,1,2,3,4,5`） |
 | `--enable_torch_compile` | bool | 否 | `false` | 启用 torch compile 以优化 transformer（使用 `--enable_torch_compile` 或 `--enable_torch_compile true/1` 来启用，`--enable_torch_compile false/0` 来禁用） |
 | `--enable_cache` | bool | 否 | `false` | 启用 transformer 缓存（使用 `--enable_cache` 或 `--enable_cache true/1` 来启用，`--enable_cache false/0` 来禁用） |
+| `--cache_type` | str | 否 | `deepcache` | Transformer 的缓存类型（例如：`deepcache, teacache, taylorcache`） |
+| `--no_cache_block_id` | str | 否 | `53` | 从 deepcache 中排除的块（例如：`0-5` 或 `0,1,2,3,4,5`） |
 | `--cache_start_step` | int | 否 | `11` | 使用缓存时跳过的起始步数 |
 | `--cache_end_step` | int | 否 | `45` | 使用缓存时跳过的结束步数 |
 | `--total_steps` | int | 否 | `50` | 总推理步数 |

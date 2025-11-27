@@ -160,6 +160,13 @@ def is_sparse_attn_available():
     except Exception:
         return False
 
+def is_angelslim_available():
+    try:
+        import angelslim
+        return True
+    except Exception:
+        return False
+
 def maybe_fallback_attn_mode(attn_mode, infer_state=None, block_idx=None):
     """
     Determine the final attention mode based on configuration and availability.

@@ -20,6 +20,7 @@ if 'PYTORCH_CUDA_ALLOC_CONF' not in os.environ:
     os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 import datetime
+import json
 
 import loguru
 import torch
@@ -45,6 +46,33 @@ def save_video(video, path):
 def rank0_log(message, level):
     if int(os.environ.get('RANK', '0')) == 0:
         loguru.logger.log(level, message)
+
+def save_config(args, output_path, task, transformer_version):
+    arguments = {}
+    for key, value in vars(args).items():
+        if not key.startswith('_') and not callable(value):
+            try:
+                json.dumps(value)
+                arguments[key] = value
+            except (TypeError, ValueError):
+                arguments[key] = str(value)
+    
+    config = {
+        'timestamp': datetime.datetime.now().isoformat(),
+        'task': task,
+        'transformer_version': transformer_version,
+        'output_path': output_path,
+        'arguments': arguments
+    }
+    
+    base_path, _ = os.path.splitext(output_path)
+    config_path = f"{base_path}_config.json"
+    
+    with open(config_path, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+    
+    print(f"Saved generation config to: {config_path}")
+    return config_path
 
 def str_to_bool(value):
     """Convert string to boolean, supporting true/false, 1/0, yes/no.
@@ -128,6 +156,7 @@ def generate_video(args):
         if output_dir:
             os.makedirs(output_dir, exist_ok=True)
         
+        original_path = None
         if enable_sr and hasattr(out, 'sr_videos'):
             save_video(out.sr_videos, output_path)
             print(f"Saved SR video to: {output_path}")
@@ -140,6 +169,12 @@ def generate_video(args):
         else:
             save_video(out.videos, output_path)
             print(f"Saved video to: {output_path}")
+        
+        if args.save_generation_config:
+            try:
+                save_config(args, output_path, task, transformer_version)
+            except Exception:
+                pass
 
 def main():
     parser = argparse.ArgumentParser(description='Generate video using HunyuanVideo-1.5')
@@ -259,6 +294,14 @@ def main():
              '--enable_cache false/0 to disable'
     )
     parser.add_argument(
+        '--cache_type', type=str, default="deepcache",
+        help='Cache type for transformer (e.g., deepcache, teacache, taylorcache)'
+    )
+    parser.add_argument(
+        '--no_cache_block_id', type=str, default="53",
+        help='Blocks to exclude from deepcache (e.g., 0-5 or 0,1,2,3,4,5)'
+    )
+    parser.add_argument(
         '--cache_start_step', type=int, default=11,
         help='Start step to skip when using cache (default: 11)'
     )
@@ -273,6 +316,12 @@ def main():
     parser.add_argument(
         '--cache_step_interval', type=int, default=4,
         help='Step interval to skip when using cache (default: 4)'
+    )
+    parser.add_argument(
+        '--save_generation_config', type=str_to_bool, nargs='?', const=True, default=True,
+        help='Save generation config file (default: true). '
+             'Use --save_generation_config or --save_generation_config true/1 to enable, '
+             '--save_generation_config false/0 to disable'
     )
 
     args = parser.parse_args()
