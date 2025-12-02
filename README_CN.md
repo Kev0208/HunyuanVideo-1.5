@@ -41,6 +41,7 @@ HunyuanVideo-1.5作为一款轻量级视频生成模型，仅需83亿参数即�
 
 ## 🔥🔥🔥 最新动态
 * 📚 训练代码即将发布。HunyuanVideo-1.5 使用 Muon 优化器进行训练，我们在[Training](#-training) 部分开源。**如果您希望继续训练我们的模型，或使用 LoRA 进行微调，请使用 Muon 优化器。**
+* 🎉 **Diffusers 支持**：HunyuanVideo-1.5 现已支持 Hugging Face Diffusers！查看我们的 [Diffusers 集合](https://huggingface.co/collections/hunyuanvideo-community/hunyuanvideo-15) 以便轻松集成。 🔥🔥🔥🆕
 * 🚀 Nov 27, 2025: 我们现已支持 cache 推理（deepcache, teacache, taylorcache），可极大加速推理！请 pull 最新代码体验。 🔥🔥🔥🆕 
 * 🚀 Nov 24, 2025: 我们现已支持 deepcache 推理。
 * 👋 Nov 20, 2025: 我们开源了 HunyuanVideo-1.5的代码和推理权重
@@ -53,6 +54,8 @@ HunyuanVideo-1.5作为一款轻量级视频生成模型，仅需83亿参数即�
 ## 🧩 社区贡献
 
 如果您在项目中使用或开发了 HunyuanVideo-1.5，欢迎告知我们。
+
+- **Diffusers** - [HunyuanVideo-1.5 Diffusers](https://huggingface.co/collections/hunyuanvideo-community/hunyuanvideo-15): HunyuanVideo-1.5 的官方 Hugging Face Diffusers 集成。使用 Diffusers 库轻松使用 HunyuanVideo-1.5，无缝集成到您的项目中。详情请参阅[使用 Diffusers](#使用-diffusers) 部分。
 
 - **ComfyUI** - [ComfyUI](https://github.com/comfyanonymous/ComfyUI): 一个强大且模块化的扩散模型图形界面，采用节点式工作流。ComfyUI 支持 HunyuanVideo-1.5，并提供多种工程加速优化以实现快速推理。
 我们提供了一个 [ComfyUI 使用指南](./ComfyUI/README.md) 用于 HunyuanVideo-1.5。
@@ -70,7 +73,7 @@ HunyuanVideo-1.5作为一款轻量级视频生成模型，仅需83亿参数即�
   - [x] 推理代码和模型权重
   - [x] 支持 ComfyUI
   - [x] 支持 LightX2V
-  - [ ] Diffusers 支持
+  - [x] Diffusers 支持
   - [ ] 发布所有模型权重（稀疏注意力、蒸馏模型和超分辨率模型）
 
 
@@ -86,7 +89,8 @@ HunyuanVideo-1.5作为一款轻量级视频生成模型，仅需83亿参数即�
 - [🧱 下载预训练模型](#-下载预训练模型)
 - [📝 提示词指南](#-提示词指南)
 - [🔑 使用方法](#-使用方法)
-  - [视频生成](#视频生成)
+  - [使用源代码推理](#使用源代码推理)
+  - [使用 Diffusers](#使用-diffusers)
   - [命令行参数](#命令行参数)
   - [最优推理配置](#最优推理配置)
 - [🧱 模型卡片](#-模型卡片)
@@ -194,7 +198,8 @@ pip install -i https://mirrors.tencent.com/pypi/simple/ --upgrade tencentcloud-s
 
 
 ## 🔑 使用方法
-### 视频生成
+
+### 使用源代码推理
 
 对于提示词重写，我们推荐使用 Gemini 或通过 vLLM 部署的大模型。当前代码库仅支持兼容 vLLM 接口的模型，如果您希望使用 Gemini，需自行实现相关接口调用。
 
@@ -317,6 +322,70 @@ torchrun --nproc_per_node=$N_INFERENCE_GPU generate.py \
 | 720→1080 超分 步数蒸馏 | 1 | None | 2 | 8 |
 
 **请注意我们提供的cfg蒸馏模型，需要50步的推理步数来获得正确的结果.**
+
+### 使用 Diffusers
+
+HunyuanVideo-1.5 现已支持 Hugging Face Diffusers！您可以使用 Diffusers 库轻松使用：
+
+**基础使用：**
+
+```python
+import torch
+
+dtype = torch.bfloat16
+device = "cuda:0"
+
+from diffusers import HunyuanVideo15Pipeline
+from diffusers.utils import export_to_video
+
+pipe = HunyuanVideo15Pipeline.from_pretrained("hunyuanvideo-community/HunyuanVideo-1.5-Diffusers-720p_t2v", torch_dtype=dtype)
+pipe.enable_model_cpu_offload()
+pipe.vae.enable_tiling()
+
+generator = torch.Generator(device=device).manual_seed(seed)
+
+video = pipe(
+    prompt=prompt,
+    generator=generator,
+    num_frames=121,
+    num_inference_steps=50,
+).frames[0]
+
+export_to_video(video, "output.mp4", fps=24)
+```
+
+**使用注意力后端优化：**
+
+HunyuanVideo-1.5 使用可变长度序列的注意力掩码。为了获得最佳性能，我们建议使用能够高效处理填充的注意力后端。
+
+我们建议安装 kernels（`pip install kernels`）以访问预构建的注意力内核。
+
+```python
+import torch
+
+dtype = torch.bfloat16
+device = "cuda:0"
+
+from diffusers import HunyuanVideo15Pipeline, attention_backend
+from diffusers.utils import export_to_video
+
+pipe = HunyuanVideo15Pipeline.from_pretrained("hunyuanvideo-community/HunyuanVideo-1.5-Diffusers-720p_t2v", torch_dtype=dtype)
+pipe.enable_model_cpu_offload()
+pipe.vae.enable_tiling()
+
+generator = torch.Generator(device=device).manual_seed(seed)
+
+with attention_backend("_flash_3_hub"): # 如果您不在 H100/H800 上，可以使用 `"flash_hub"`
+    video = pipe(
+        prompt=prompt,
+        generator=generator,
+        num_frames=121,
+        num_inference_steps=50,
+    ).frames[0]
+    export_to_video(video, "output.mp4", fps=24)
+```
+
+更多详情，请访问 [HunyuanVideo-1.5 Diffusers 集合](https://huggingface.co/collections/hunyuanvideo-community/hunyuanvideo-15)。
 
 
 ## 🧱 模型卡片

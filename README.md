@@ -42,6 +42,7 @@ HunyuanVideo-1.5 is a video generation model that delivers top-tier quality with
 
 ## 🔥🔥🔥 News
 * 📚 Training code is coming soon. HunyuanVideo-1.5 is trained using the Muon optimizer, which we have open-sourced in the in [Training](#-training) section. **If you would like to continue training our model or fine-tune it with LoRA, please use the Muon optimizer.**
+* 🎉 **Diffusers Support**: HunyuanVideo-1.5 is now available on Hugging Face Diffusers! Check out [Diffusers collection](https://huggingface.co/collections/hunyuanvideo-community/hunyuanvideo-15) for easy integration. 🔥🔥🔥🆕
 * 🚀 Nov 27, 2025: We now support cache inference (deepcache, teacache, taylorcache), achieving significant speedup! Pull the latest code to try it. 🔥🔥🔥🆕 
 * 🚀 Nov 24, 2025: We now support deepcache inference.
 * 👋 Nov 20, 2025: We release the inference code and model weights of HunyuanVideo-1.5.
@@ -55,6 +56,8 @@ HunyuanVideo-1.5 is a video generation model that delivers top-tier quality with
 ## 🧩 Community Contributions
 
 If you develop/use HunyuanVideo-1.5 in your projects, welcome to let us know.
+
+- **Diffusers** - [HunyuanVideo-1.5 Diffusers](https://huggingface.co/collections/hunyuanvideo-community/hunyuanvideo-15): Official Hugging Face Diffusers integration for HunyuanVideo-1.5. Easily use HunyuanVideo-1.5 with the Diffusers library for seamless integration into your projects. See [Usage with Diffusers](#usage-with-diffusers) section for details.
 
 - **ComfyUI** - [ComfyUI](https://github.com/comfyanonymous/ComfyUI): A powerful and modular diffusion model GUI with a graph/nodes interface. ComfyUI supports HunyuanVideo-1.5 with various engineering optimizations for fast inference. We provide a [ComfyUI Usage Guide](./ComfyUI/README.md) for HunyuanVideo-1.5.
 
@@ -72,7 +75,7 @@ If you develop/use HunyuanVideo-1.5 in your projects, welcome to let us know.
   - [x] Inference Code and checkpoints
   - [x] ComfyUI Support
   - [x] LightX2V Support
-  - [ ] Diffusers Support
+  - [x] Diffusers Support
   - [ ] Release all model weights (Sparse attention, distill model, and SR models)
 
 ## 📋 Table of Contents
@@ -87,6 +90,8 @@ If you develop/use HunyuanVideo-1.5 in your projects, welcome to let us know.
 - [🧱 Download Pretrained Models](#-download-pretrained-models)
 - [📝 Prompt Guide](#-prompt-guide)
 - [🔑 Usage](#-usage)
+  - [Inference with Source Code](#inference-with-source-code)
+  - [Usage with Diffusers](#usage-with-diffusers)
   - [Prompt Enhancement](#prompt-enhancement)
   - [Text to Video](#text-to-video)
   - [Image to Video](#image-to-video)
@@ -193,7 +198,8 @@ Prompt enhancement plays a crucial role in enabling our model to generate high-q
 For users seeking to optimize prompts for other large models, it is recommended to consult the definition of `t2v_rewrite_system_prompt` in the file `hyvideo/utils/rewrite/t2v_prompt.py` to guide text-to-video rewriting. Similarly, for image-to-video rewriting, refer to the definition of `i2v_rewrite_system_prompt` in `hyvideo/utils/rewrite/i2v_prompt.py`.
 
 ## 🔑 Usage
-### Video Generation
+
+### Inference with Source Code
 
 For prompt rewriting, we recommend using Gemini or models deployed via vLLM. This codebase currently only supports models compatible with the vLLM API. If you wish to use Gemini, you will need to implement your own interface calls.
 
@@ -315,6 +321,70 @@ The following table provides the optimal inference configurations (CFG scale, em
 | 720→1080 SR Step Distilled | 1 | None | 2 | 8 |
 
 **Please note that the cfg distilled model we provided, must use 50 steps to generate correct results.**
+
+### Usage with Diffusers
+
+HunyuanVideo-1.5 is available on Hugging Face Diffusers! You can easily use it with the Diffusers library:
+
+**Basic Usage:**
+
+```python
+import torch
+
+dtype = torch.bfloat16
+device = "cuda:0"
+
+from diffusers import HunyuanVideo15Pipeline
+from diffusers.utils import export_to_video
+
+pipe = HunyuanVideo15Pipeline.from_pretrained("hunyuanvideo-community/HunyuanVideo-1.5-Diffusers-720p_t2v", torch_dtype=dtype)
+pipe.enable_model_cpu_offload()
+pipe.vae.enable_tiling()
+
+generator = torch.Generator(device=device).manual_seed(seed)
+
+video = pipe(
+    prompt=prompt,
+    generator=generator,
+    num_frames=121,
+    num_inference_steps=50,
+).frames[0]
+
+export_to_video(video, "output.mp4", fps=24)
+```
+
+**Optimized Usage with Attention Backend:**
+
+HunyuanVideo-1.5 uses attention masks with variable-length sequences. For best performance, we recommend using an attention backend that handles padding efficiently.
+
+We recommend installing kernels (`pip install kernels`) to access prebuilt attention kernels.
+
+```python
+import torch
+
+dtype = torch.bfloat16
+device = "cuda:0"
+
+from diffusers import HunyuanVideo15Pipeline, attention_backend
+from diffusers.utils import export_to_video
+
+pipe = HunyuanVideo15Pipeline.from_pretrained("hunyuanvideo-community/HunyuanVideo-1.5-Diffusers-720p_t2v", torch_dtype=dtype)
+pipe.enable_model_cpu_offload()
+pipe.vae.enable_tiling()
+
+generator = torch.Generator(device=device).manual_seed(seed)
+
+with attention_backend("_flash_3_hub"): # or `"flash_hub"` if you are not on H100/H800
+    video = pipe(
+        prompt=prompt,
+        generator=generator,
+        num_frames=121,
+        num_inference_steps=50,
+    ).frames[0]
+    export_to_video(video, "output.mp4", fps=24)
+```
+
+For more details, please visit [HunyuanVideo-1.5 Diffusers Collection](https://huggingface.co/collections/hunyuanvideo-community/hunyuanvideo-15).
 
 
 ## 🧱 Models Cards
